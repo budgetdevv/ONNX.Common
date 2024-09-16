@@ -87,6 +87,11 @@ namespace ONNX.Common
 
         private readonly Configuration Config;
         
+        public ConfigurableOnnxModel()
+        {
+            throw new NotSupportedException();
+        }
+        
         public ConfigurableOnnxModel(Configuration config)
         {
             Config = config;
