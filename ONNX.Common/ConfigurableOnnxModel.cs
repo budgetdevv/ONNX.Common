@@ -43,7 +43,7 @@ namespace ONNX.Common
             }
             
             [UnscopedRef]
-            public ref Configuration WithDeviceType(BackendType backendType, int deviceID = 0)
+            public ref Configuration WithBackendType(BackendType backendType, int deviceID = 0)
             {
                 BackendType = backendType;
                 DeviceID = deviceID;
