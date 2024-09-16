@@ -1,10 +1,11 @@
 namespace ONNX.Common.Configs
 {
-    public enum DeviceType
+    public enum BackendType
     {
         CPU,
         CUDA,
         DirectML,
         CoreML,
+        TensorRT,
     }
 }

@@ -13,7 +13,7 @@ namespace ONNX.Common
             
             public string? ModelPath;  
             
-            public DeviceType DeviceType;
+            public BackendType BackendType;
 
             public int DeviceID;
             
@@ -27,7 +27,7 @@ namespace ONNX.Common
             {
                 SessionOptions = new();
                 ModelPath = null;
-                DeviceType = DeviceType.CPU;
+                BackendType = BackendType.CPU;
                 DeviceID = 0;
                 MemoryMode = OnnxMemoryModes.None;
                 RegisterOrtExtensions = false;
@@ -43,9 +43,9 @@ namespace ONNX.Common
             }
             
             [UnscopedRef]
-            public ref Configuration WithDeviceType(DeviceType deviceType, int deviceID = 0)
+            public ref Configuration WithDeviceType(BackendType backendType, int deviceID = 0)
             {
-                DeviceType = deviceType;
+                BackendType = backendType;
                 DeviceID = deviceID;
                 
                 return ref this;
@@ -100,22 +100,26 @@ namespace ONNX.Common
             
             var deviceID = config.DeviceID;
 
-            switch (config.DeviceType)
+            switch (config.BackendType)
             {
                 // "Unhandled exception. Microsoft.ML.OnnxRuntime.OnnxRuntimeException: [ErrorCode:Fail] Provider CPUExecutionProvider has already been registered."
                 // case DeviceType.CPU:
                 //     sessionOptions.AppendExecutionProvider_CPU();
                 //     break;
                 
-                case DeviceType.CUDA:
+                case BackendType.TensorRT:
+                    sessionOptions.AppendExecutionProvider_Tensorrt(deviceID);
+                    break;
+                
+                case BackendType.CUDA:
                     sessionOptions.AppendExecutionProvider_CUDA(deviceID);
                     break;
                 
-                case DeviceType.DirectML:
+                case BackendType.DirectML:
                     sessionOptions.AppendExecutionProvider_DML(deviceID);
                     break;
                 
-                case DeviceType.CoreML:
+                case BackendType.CoreML:
                     // https://github.com/microsoft/onnxruntime/blob/main/include/onnxruntime/core/providers/coreml/coreml_provider_factory.h
                     sessionOptions.AppendExecutionProvider_CoreML();
                     break;
