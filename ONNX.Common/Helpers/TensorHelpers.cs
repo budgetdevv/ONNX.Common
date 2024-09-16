@@ -162,5 +162,13 @@ namespace ONNX.Common.Helpers
         {
             return NamedOnnxValue.CreateFromTensor(name, tensor);
         }
+        
+        public static NamedOnnxValue AllocateEmptyNamedTensorValue<T>(string name)
+            where T : unmanaged
+        {
+            var tensor = new DenseTensor<T>(Array.Empty<T>().AsMemory(), [ 0 ]);
+            
+            return NamedOnnxValue.CreateFromTensor(name, tensor);
+        }
     }
 }
