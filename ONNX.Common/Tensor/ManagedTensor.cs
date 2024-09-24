@@ -40,10 +40,8 @@ namespace ONNX.Common.Tensor
             ValuesArr = arr;
             
             // OnnxORTValue = OrtValue.CreateTensorValueFromMemory<T>(pinnedMemory, dimensions.WidenDimensions());
-
-            Memory<T> memory;
             
-            memory = snTensor.IsPinned ? 
+            var memory = snTensor.IsPinned ? 
                 MemoryMarshal.CreateFromPinnedArray(arr, 0, arr.Length) :
                 arr.AsMemory();
             
