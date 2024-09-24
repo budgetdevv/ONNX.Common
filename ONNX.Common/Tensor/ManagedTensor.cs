@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using ONNX.Common.Helpers;
@@ -40,8 +41,14 @@ namespace ONNX.Common.Tensor
             
             // OnnxORTValue = OrtValue.CreateTensorValueFromMemory<T>(pinnedMemory, dimensions.WidenDimensions());
 
+            Memory<T> memory;
+            
+            memory = snTensor.IsPinned ? 
+                MemoryMarshal.CreateFromPinnedArray(arr, 0, arr.Length) :
+                arr.AsMemory();
+            
             // Span overload doesn't wrap memory ( Unsurprisingly )
-            OnnxDenseTensor = new(arr.AsMemory(), dimensions);
+            OnnxDenseTensor = new(memory, dimensions);
             
             return;
             
