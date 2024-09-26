@@ -1,11 +1,12 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Microsoft.ML.OnnxRuntime;
 using ONNX.Common.Configs;
 
 namespace ONNX.Common
 {
-    public readonly struct ConfigurableOnnxModel: IDisposable
+    public struct ConfigurableOnnxModel: IDisposable
     {
         public struct Configuration
         {
@@ -80,8 +81,31 @@ namespace ONNX.Common
                 return new(this);
             }
         }
+
+        public readonly struct SessionHandle: IDisposable
+        {
+            public readonly InferenceSession Session;
+
+            private readonly bool UnloadAfterUse;
+            
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal SessionHandle(InferenceSession session, bool unloadAfterUse)
+            {
+                Session = session;
+                UnloadAfterUse = unloadAfterUse;
+            }
+            
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Dispose()
+            {
+                if (UnloadAfterUse)
+                {
+                    Session?.Dispose();
+                }
+            }
+        }
         
-        public readonly InferenceSession Session;
+        private InferenceSession? Session;
 
         private readonly SessionOptions SessionOptions;
 
@@ -132,9 +156,29 @@ namespace ONNX.Common
 
             sessionOptions.LogSeverityLevel = config.LoggingLevel;
             
-            Session = new(modelPath: config.ModelPath, options: sessionOptions);
+            if ((Config.MemoryMode & OnnxMemoryModes.DeferLoading) == 0)
+            {
+                Session = CreateSession(config, sessionOptions);
+            }
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public SessionHandle GetSessionHandle()
+        {
+            var config = Config;
+            var session = Session ??= CreateSession(config, SessionOptions);
+            
+            var unloadAfterUse = (config.MemoryMode & OnnxMemoryModes.UnloadAfterUse) != 0;
+            
+            return new(session, unloadAfterUse);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static InferenceSession CreateSession(Configuration config, SessionOptions sessionOptions)
+        {
+            return new(modelPath: config.ModelPath, options: sessionOptions);
+        }
+        
         public void Dispose()
         {
             Session.Dispose();

@@ -1,9 +1,12 @@
+using System;
+
 namespace ONNX.Common.Configs
 {
+    [Flags]
     public enum OnnxMemoryModes
     {
         None,
-        EagerLoading,
+        DeferLoading,
         UnloadAfterUse,
     }
 }
