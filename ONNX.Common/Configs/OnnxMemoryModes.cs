@@ -7,6 +7,8 @@ namespace ONNX.Common.Configs
     {
         None,
         DeferLoading,
+        // UnloadAfterUse is also implicitly DeferLoading.
+        // It does make sense because model reloading is deferred.
         UnloadAfterUse,
     }
 }

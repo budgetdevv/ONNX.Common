@@ -16,6 +16,18 @@
     <ItemGroup>
         <EmbeddedResource Include="Resources\Embedded\*.*" Visible="true" />
     </ItemGroup>
+
+    <!-- This is required for some reason ( For MacOS at least, I think it is because I'm on Sequoia ). -->
+    <!-- I stole the dylib from the nuget package folder of Microsoft.ML.OnnxRuntime.Extensions -->
+    <!-- Sometimes OSX might block the dylib file, here's how to allow it: https://imgur.com/a/MGXOgFX -->
+    <ItemGroup>
+        <None Update="Resources/ortextensions.dylib"
+              Condition="$([MSBuild]::IsOSPlatform('OSX'))"
+              Visible="false">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <Link>ortextensions.dylib</Link>
+        </None>
+    </ItemGroup>
     
     <!--  https://youtrack.jetbrains.com/issue/RIDER-26906 -->
     <Target Name="ExcludeAnnoyingDylib" AfterTargets="ResolveAssemblyReferences">

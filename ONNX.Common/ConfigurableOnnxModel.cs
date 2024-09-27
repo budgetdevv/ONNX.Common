@@ -6,12 +6,82 @@ using ONNX.Common.Configs;
 
 namespace ONNX.Common
 {
-    public struct ConfigurableOnnxModel: IDisposable
+    public static class ConfigurableOnnxModel
     {
-        public struct Configuration
+        public struct BuiltConfig
         {
             public SessionOptions SessionOptions;
             
+            public string ModelPath;  
+            
+            public BackendType BackendType;
+
+            public int DeviceID;
+            
+            public OnnxMemoryModes MemoryMode;
+            
+            public bool RegisterOrtExtensions;
+            
+            public OrtLoggingLevel LoggingLevel;
+            
+            [Obsolete("Use constructor with parameters", error: true)]
+            public BuiltConfig()
+            {
+                throw new NotSupportedException();
+            }
+            
+            public BuiltConfig(ConfigBuilder configBuilder)
+            {
+                var sessionOptions = SessionOptions = new();
+                
+                ModelPath = configBuilder.ModelPath ?? throw new ArgumentNullException(nameof(configBuilder.ModelPath));
+                
+                var backendType = BackendType = configBuilder.BackendType;
+                
+                var deviceID = DeviceID = configBuilder.DeviceID;
+                
+                MemoryMode = configBuilder.MemoryMode;
+                
+                var registerOrtExtensions = RegisterOrtExtensions = configBuilder.RegisterOrtExtensions;
+                
+                var loggingLevel = LoggingLevel = configBuilder.LoggingLevel;
+            
+                if (registerOrtExtensions)
+                {
+                    sessionOptions.RegisterOrtExtensions();
+                }
+
+                switch (backendType)
+                {
+                    // "Unhandled exception. Microsoft.ML.OnnxRuntime.OnnxRuntimeException: [ErrorCode:Fail] Provider CPUExecutionProvider has already been registered."
+                    // case DeviceType.CPU:
+                    //     sessionOptions.AppendExecutionProvider_CPU();
+                    //     break;
+                
+                    case BackendType.TensorRT:
+                        sessionOptions.AppendExecutionProvider_Tensorrt(deviceID);
+                        break;
+                
+                    case BackendType.CUDA:
+                        sessionOptions.AppendExecutionProvider_CUDA(deviceID);
+                        break;
+                
+                    case BackendType.DirectML:
+                        sessionOptions.AppendExecutionProvider_DML(deviceID);
+                        break;
+                
+                    case BackendType.CoreML:
+                        // https://github.com/microsoft/onnxruntime/blob/main/include/onnxruntime/core/providers/coreml/coreml_provider_factory.h
+                        sessionOptions.AppendExecutionProvider_CoreML();
+                        break;
+                }
+
+                sessionOptions.LogSeverityLevel = loggingLevel;
+            }
+        }
+        
+        public struct ConfigBuilder
+        {
             public string? ModelPath;  
             
             public BackendType BackendType;
@@ -24,9 +94,8 @@ namespace ONNX.Common
             
             public OrtLoggingLevel LoggingLevel;
 
-            public Configuration()
+            public ConfigBuilder()
             {
-                SessionOptions = new();
                 ModelPath = null;
                 BackendType = BackendType.CPU;
                 DeviceID = 0;
@@ -36,7 +105,7 @@ namespace ONNX.Common
             }
 
             [UnscopedRef]
-            public ref Configuration WithModelPath(string? modelPath)
+            public ref ConfigBuilder WithModelPath(string? modelPath)
             {
                 ModelPath = modelPath;
                 
@@ -44,7 +113,7 @@ namespace ONNX.Common
             }
             
             [UnscopedRef]
-            public ref Configuration WithBackendType(BackendType backendType, int deviceID = 0)
+            public ref ConfigBuilder WithBackendType(BackendType backendType, int deviceID = 0)
             {
                 BackendType = backendType;
                 DeviceID = deviceID;
@@ -53,7 +122,7 @@ namespace ONNX.Common
             }
             
             [UnscopedRef]
-            public ref Configuration WithMemoryMode(OnnxMemoryModes memoryMode)
+            public ref ConfigBuilder WithMemoryMode(OnnxMemoryModes memoryMode)
             {
                 MemoryMode = memoryMode;
                 
@@ -61,7 +130,7 @@ namespace ONNX.Common
             }
             
             [UnscopedRef]
-            public ref Configuration WithRegisterOrtExtensions()
+            public ref ConfigBuilder WithRegisterOrtExtensions()
             {
                 RegisterOrtExtensions = true;
 
@@ -69,36 +138,48 @@ namespace ONNX.Common
             }
             
             [UnscopedRef]
-            public ref Configuration WithLoggingLevel(OrtLoggingLevel loggingLevel)
+            public ref ConfigBuilder WithLoggingLevel(OrtLoggingLevel loggingLevel)
             {
                 LoggingLevel = loggingLevel;
 
                 return ref this;
             }
-
-            public ConfigurableOnnxModel CreateModel()
+            
+            public BuiltConfig Build()
             {
                 return new(this);
             }
         }
-
+    
+        public interface IConfig
+        {
+            public static abstract BuiltConfig Config { get; }
+        }
+    }
+    
+    public struct ConfigurableOnnxModel<ConfigT>: IDisposable
+        where ConfigT: struct, ConfigurableOnnxModel.IConfig
+    {
         public readonly struct SessionHandle: IDisposable
         {
             public readonly InferenceSession Session;
 
-            private readonly bool UnloadAfterUse;
+            [Obsolete("Use constructor with parameters", error: true)]
+            public SessionHandle()
+            {
+                throw new NotSupportedException();
+            }
             
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal SessionHandle(InferenceSession session, bool unloadAfterUse)
+            internal SessionHandle(InferenceSession session)
             {
                 Session = session;
-                UnloadAfterUse = unloadAfterUse;
             }
             
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                if (UnloadAfterUse)
+                if (ConfigT.Config.MemoryMode.HasFlag(OnnxMemoryModes.UnloadAfterUse))
                 {
                     Session?.Dispose();
                 }
@@ -106,83 +187,59 @@ namespace ONNX.Common
         }
         
         private InferenceSession? Session;
-
-        private readonly SessionOptions SessionOptions;
-
-        private readonly Configuration Config;
         
         public ConfigurableOnnxModel()
         {
-            throw new NotSupportedException();
-        }
-        
-        public ConfigurableOnnxModel(Configuration config)
-        {
-            Config = config;
+            var memoryMode = ConfigT.Config.MemoryMode;
             
-            var sessionOptions = SessionOptions = config.SessionOptions;
-            
-            if (config.RegisterOrtExtensions)
+            if (!memoryMode.HasFlag(OnnxMemoryModes.DeferLoading) &&
+                !memoryMode.HasFlag(OnnxMemoryModes.UnloadAfterUse))
             {
-                sessionOptions.RegisterOrtExtensions();
-            }
-            
-            var deviceID = config.DeviceID;
-
-            switch (config.BackendType)
-            {
-                // "Unhandled exception. Microsoft.ML.OnnxRuntime.OnnxRuntimeException: [ErrorCode:Fail] Provider CPUExecutionProvider has already been registered."
-                // case DeviceType.CPU:
-                //     sessionOptions.AppendExecutionProvider_CPU();
-                //     break;
-                
-                case BackendType.TensorRT:
-                    sessionOptions.AppendExecutionProvider_Tensorrt(deviceID);
-                    break;
-                
-                case BackendType.CUDA:
-                    sessionOptions.AppendExecutionProvider_CUDA(deviceID);
-                    break;
-                
-                case BackendType.DirectML:
-                    sessionOptions.AppendExecutionProvider_DML(deviceID);
-                    break;
-                
-                case BackendType.CoreML:
-                    // https://github.com/microsoft/onnxruntime/blob/main/include/onnxruntime/core/providers/coreml/coreml_provider_factory.h
-                    sessionOptions.AppendExecutionProvider_CoreML();
-                    break;
-            }
-
-            sessionOptions.LogSeverityLevel = config.LoggingLevel;
-            
-            if ((Config.MemoryMode & OnnxMemoryModes.DeferLoading) == 0)
-            {
-                Session = CreateSession(config, sessionOptions);
+                Session = CreateSession();
             }
         }
         
+        // It looks deceptively bloated, but the branches are optimized away
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public SessionHandle GetSessionHandle()
         {
-            var config = Config;
-            var session = Session ??= CreateSession(config, SessionOptions);
+            var memoryMode = ConfigT.Config.MemoryMode;
+
+            InferenceSession session;
             
-            var unloadAfterUse = (config.MemoryMode & OnnxMemoryModes.UnloadAfterUse) != 0;
+            // If UnloadAfterUse is set, we can optimize away the null check,
+            // since we know that a new session will always be created.
+            // UnloadAfterUse is also implicitly DeferLoading.
+            if (memoryMode.HasFlag(OnnxMemoryModes.UnloadAfterUse))
+            {
+                session = CreateSession();
+            }
             
-            return new(session, unloadAfterUse);
+            // If we are deferring loading, we still cache the model...
+            else if (memoryMode.HasFlag(OnnxMemoryModes.DeferLoading))
+            {
+                session = (Session ??= CreateSession());
+            }
+
+            else //The model is already cached!
+            {
+                session = Session!;
+            }
+            
+            return new(session);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static InferenceSession CreateSession(Configuration config, SessionOptions sessionOptions)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static InferenceSession CreateSession()
         {
-            return new(modelPath: config.ModelPath, options: sessionOptions);
+            var config = ConfigT.Config;
+            
+            return new(modelPath: config.ModelPath, options: config.SessionOptions);
         }
         
         public void Dispose()
         {
-            Session.Dispose();
-            SessionOptions.Dispose();
+            Session?.Dispose();
         }
     }
 }

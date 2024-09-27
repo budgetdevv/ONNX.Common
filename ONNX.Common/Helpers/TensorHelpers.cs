@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.ML.OnnxRuntime;
@@ -169,6 +170,20 @@ namespace ONNX.Common.Helpers
             var tensor = new DenseTensor<T>(Array.Empty<T>().AsMemory(), [ 0 ]);
             
             return NamedOnnxValue.CreateFromTensor(name, tensor);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ManagedTensor<T> Squeeze<T>(this ManagedTensor<T> tensor)
+            where T : unmanaged
+        {
+            return tensor.SNTensor.Squeeze();
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ManagedTensor<T> Reshape<T>(this ManagedTensor<T> tensor, ReadOnlySpan<nint> dimensions)
+            where T : unmanaged
+        {
+            return tensor.SNTensor.Reshape(dimensions);
         }
     }
 }
