@@ -6,6 +6,7 @@ using ONNX.Common.Configs;
 using ONNX.Common.Helpers;
 using ONNX.Common.Tensor;
 using Tokenizers.NET;
+using Tokenizers.NET.Collections;
 
 namespace Playground
 {
@@ -39,16 +40,17 @@ namespace Playground
 
         private struct JinaReranker
         {
-            internal struct TokenizerConfig: ITokenizerConfig
+            internal struct TokenizerConfig: Tokenizer.IConfig
             {
-                public static uint ExpectedMaxInputLength => 512;
+                private static readonly Tokenizer.BuiltConfig BUILT_CONFIG =
+                    new Tokenizer.ConfigBuilder()
+                    .SetExpectedMaxInputLength(512)
+                    .SetExpectedMaxBatches(16)
+                    .SetExceedExpectedMaxBatchesBehavior(Tokenizers.NET.Tokenizer.ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
+                    .SetTokenizerJsonPath("Resources/jina_tokenizer.json")
+                    .Build();
 
-                public static uint ExpectedMaxBatches => 2;
-
-                public static string TokenizerJsonPath => "Resources/jina_tokenizer.json";
-
-                public static ExceedExpectedMaxBatchesBehavior ExceedExpectedMaxBatchesBehavior
-                    => ExceedExpectedMaxBatchesBehavior.AllocateBuffer;
+                public static Tokenizer.BuiltConfig BuiltConfig => BUILT_CONFIG;
             }
 
             public readonly struct Output(int index, float score)
@@ -198,7 +200,7 @@ namespace Playground
         [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
         private static void TokenizeBatch_DISASM(Tokenizer<JinaReranker.TokenizerConfig> tokenizer, ReadOnlySpan<string> inputs)
         {
-            tokenizer.TokenizeBatch(inputs);
+            tokenizer.TokenizeBatch(inputs, new NativeMemory<TokenizeOutput>((nuint) inputs.Length));
         }
         
         private static void CheckCodegen()
@@ -212,7 +214,7 @@ namespace Playground
             
             var model = new JinaReranker();
             
-            DisposeSessionHandle_DISASM(GetSessionHandle_DISASM(model.Model));
+            // DisposeSessionHandle_DISASM(GetSessionHandle_DISASM(model.Model));
 
             // Ensure we ain't cheating by passing a constant span value
             // E.x. TokenizeBatch_DISASM(model.Tokenizer, [ "Hi", "Bye" ]);
