@@ -1,7 +1,6 @@
 ﻿using System.Buffers;
-using System.Numerics.Tensors;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
 using ONNX.Common;
 using ONNX.Common.Configs;
 using ONNX.Common.Helpers;
@@ -12,6 +11,19 @@ namespace Playground
 {
     internal static class Program
     {
+        [ModuleInitializer]
+        internal static void Init()
+        {
+            RuntimeHelpers.RunClassConstructor(typeof(JinaReranker.TokenizerConfig).TypeHandle);
+            RuntimeHelpers.RunClassConstructor(typeof(JinaReranker).TypeHandle);
+        }
+        
+        private static void Main(string[] args)
+        {
+            CheckCodegen();
+            // SampleInference();
+        }
+        
         private struct OnnxConfig: ConfigurableOnnxModel.IConfig
         {
             private static readonly ConfigurableOnnxModel.BuiltConfig CONFIG = 
@@ -27,13 +39,16 @@ namespace Playground
 
         private struct JinaReranker
         {
-            private struct TokenizerConfig: ITokenizerConfig
+            internal struct TokenizerConfig: ITokenizerConfig
             {
                 public static uint ExpectedMaxInputLength => 512;
 
                 public static uint ExpectedMaxBatches => 2;
 
                 public static string TokenizerJsonPath => "Resources/jina_tokenizer.json";
+
+                public static ExceedExpectedMaxBatchesBehavior ExceedExpectedMaxBatchesBehavior
+                    => ExceedExpectedMaxBatchesBehavior.AllocateBuffer;
             }
 
             public readonly struct Output(int index, float score)
@@ -43,9 +58,9 @@ namespace Playground
                 public readonly float Score = score;
             }
             
-            private Tokenizer<TokenizerConfig> Tokenizer;
+            internal Tokenizer<TokenizerConfig> Tokenizer;
             
-            private ConfigurableOnnxModel<OnnxConfig> Model;
+            internal ConfigurableOnnxModel<OnnxConfig> Model;
 
             public JinaReranker()
             {
@@ -167,8 +182,50 @@ namespace Playground
                 }
             }
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+        private static ConfigurableOnnxModel<OnnxConfig>.SessionHandle GetSessionHandle_DISASM(ConfigurableOnnxModel<OnnxConfig> model)
+        {
+            return model.GetSessionHandle();
+        }
         
-        private static void Main(string[] args)
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+        private static void DisposeSessionHandle_DISASM(ConfigurableOnnxModel<OnnxConfig>.SessionHandle handle)
+        {
+            handle.Dispose();
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+        private static void TokenizeBatch_DISASM(Tokenizer<JinaReranker.TokenizerConfig> tokenizer, ReadOnlySpan<string> inputs)
+        {
+            tokenizer.TokenizeBatch(inputs);
+        }
+        
+        private static void CheckCodegen()
+        {
+            // How to check codegen:
+            // Mac:
+            // export DOTNET_JitDisasm="*_DISASM"
+            // Windows:
+            // $Env:DOTNET_JitDisasm="*_DISASM"
+            // dotnet run -c Release
+            
+            var model = new JinaReranker();
+            
+            DisposeSessionHandle_DISASM(GetSessionHandle_DISASM(model.Model));
+
+            // Ensure we ain't cheating by passing a constant span value
+            // E.x. TokenizeBatch_DISASM(model.Tokenizer, [ "Hi", "Bye" ]);
+            var list = new List<string>()
+            {
+                "Organic skincare for sensitive skin with aloe vera and chamomile.",
+                "New makeup trends focus on bold colors and innovative techniques",
+            };
+            
+            TokenizeBatch_DISASM(model.Tokenizer, list.ToArray());
+        }
+        
+        private static void SampleInference()
         {
             var ranker = new JinaReranker();
 
