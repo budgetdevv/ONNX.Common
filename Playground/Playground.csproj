@@ -5,6 +5,7 @@
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <PropertyGroup Condition="$([MSBuild]::IsOsPlatform('Windows'))">
@@ -21,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Tokenizers.NET" Version="1.1.0-alpha-7-0d2487e" />
+      <PackageReference Include="Tokenizers.NET" Version="1.1.0-alpha.12-dc88085" />
     </ItemGroup>
     
     <ItemGroup>

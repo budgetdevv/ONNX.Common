@@ -25,6 +25,61 @@ namespace Playground
             // SampleInference();
         }
         
+        private static unsafe void CheckCodegen()
+        {
+            // How to check codegen:
+            // Mac:
+            // export DOTNET_JitDisasm="*_DISASM"
+            // Windows:
+            // $Env:DOTNET_JitDisasm="*_DISASM"
+            // dotnet run -c Release
+            
+            var model = new JinaReranker();
+
+            // Ensure we ain't cheating by passing a constant span value
+            // E.x. TokenizeBatch_DISASM(model.Tokenizer, [ "Hi", "Bye" ]);
+            var list = new List<string>()
+            {
+                "Organic skincare for sensitive skin with aloe vera and chamomile.",
+                "New makeup trends focus on bold colors and innovative techniques",
+            };
+            
+            // DisposeSessionHandle_DISASM(GetSessionHandle_DISASM(model.Model));
+            
+            TokenizeBatch_DISASM(model.Tokenizer, list.ToArray(), out var outputs);
+            
+            DisposeTokenizeBatchOutput_DISASM(*outputs.Buffer.Ptr);
+        }
+        
+        private const MethodImplOptions DISASM_METHOD_IMPL_OPTIONS = MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization;
+        
+        [MethodImpl(DISASM_METHOD_IMPL_OPTIONS)]
+        private static ConfigurableOnnxModel<OnnxConfig>.SessionHandle GetSessionHandle_DISASM(ConfigurableOnnxModel<OnnxConfig> model)
+        {
+            return model.GetSessionHandle();
+        }
+        
+        [MethodImpl(DISASM_METHOD_IMPL_OPTIONS)]
+        private static void DisposeSessionHandle_DISASM(ConfigurableOnnxModel<OnnxConfig>.SessionHandle handle)
+        {
+            handle.Dispose();
+        }
+
+        [MethodImpl(DISASM_METHOD_IMPL_OPTIONS)]
+        private static void TokenizeBatch_DISASM(
+            Tokenizer<JinaReranker.TokenizerConfig> 
+                tokenizer, ReadOnlySpan<string> inputs,
+            out NativeMemory<TokenizeOutput> outputs)
+        {
+            tokenizer.TokenizeBatch(inputs, outputs = new((nuint) inputs.Length));
+        }
+        
+        [MethodImpl(DISASM_METHOD_IMPL_OPTIONS)]
+        private static void DisposeTokenizeBatchOutput_DISASM(TokenizeOutput output)
+        {
+            output.Dispose();
+        }
+        
         private struct OnnxConfig: ConfigurableOnnxModel.IConfig
         {
             private static readonly ConfigurableOnnxModel.BuiltConfig CONFIG = 
@@ -183,48 +238,6 @@ namespace Playground
                     return outputs.ToArray();
                 }
             }
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
-        private static ConfigurableOnnxModel<OnnxConfig>.SessionHandle GetSessionHandle_DISASM(ConfigurableOnnxModel<OnnxConfig> model)
-        {
-            return model.GetSessionHandle();
-        }
-        
-        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
-        private static void DisposeSessionHandle_DISASM(ConfigurableOnnxModel<OnnxConfig>.SessionHandle handle)
-        {
-            handle.Dispose();
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
-        private static void TokenizeBatch_DISASM(Tokenizer<JinaReranker.TokenizerConfig> tokenizer, ReadOnlySpan<string> inputs)
-        {
-            tokenizer.TokenizeBatch(inputs, new NativeMemory<TokenizeOutput>((nuint) inputs.Length));
-        }
-        
-        private static void CheckCodegen()
-        {
-            // How to check codegen:
-            // Mac:
-            // export DOTNET_JitDisasm="*_DISASM"
-            // Windows:
-            // $Env:DOTNET_JitDisasm="*_DISASM"
-            // dotnet run -c Release
-            
-            var model = new JinaReranker();
-            
-            // DisposeSessionHandle_DISASM(GetSessionHandle_DISASM(model.Model));
-
-            // Ensure we ain't cheating by passing a constant span value
-            // E.x. TokenizeBatch_DISASM(model.Tokenizer, [ "Hi", "Bye" ]);
-            var list = new List<string>()
-            {
-                "Organic skincare for sensitive skin with aloe vera and chamomile.",
-                "New makeup trends focus on bold colors and innovative techniques",
-            };
-            
-            TokenizeBatch_DISASM(model.Tokenizer, list.ToArray());
         }
         
         private static void SampleInference()
