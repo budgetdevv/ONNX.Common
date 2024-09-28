@@ -85,7 +85,7 @@ namespace Playground
             private static readonly ConfigurableOnnxModel.BuiltConfig CONFIG = 
                 new ConfigurableOnnxModel.ConfigBuilder()
                     .WithBackendType(BackendType.CPU)
-                    .WithMemoryMode(OnnxMemoryModes.None)
+                    .WithMemoryMode(OnnxMemoryModes.DeferLoading)
                     .WithRegisterOrtExtensions()
                     .WithModelPath("/Users/trumpmcdonaldz/Desktop/JINA/model_quantized.onnx")
                     .Build();
