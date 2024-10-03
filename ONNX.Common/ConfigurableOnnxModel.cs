@@ -30,7 +30,7 @@ namespace ONNX.Common
                 throw new NotSupportedException();
             }
             
-            public BuiltConfig(ConfigBuilder configBuilder)
+            internal BuiltConfig(ConfigBuilder configBuilder)
             {
                 var sessionOptions = SessionOptions = new();
                 
@@ -145,7 +145,7 @@ namespace ONNX.Common
                 return ref this;
             }
             
-            public BuiltConfig Build()
+            internal BuiltConfig Build()
             {
                 return new(this);
             }
@@ -153,13 +153,17 @@ namespace ONNX.Common
     
         public interface IConfig
         {
-            public static abstract BuiltConfig Config { get; }
+            public static abstract ConfigBuilder ConfigBuilder { get; }
         }
     }
     
     public struct ConfigurableOnnxModel<ConfigT>: IDisposable
         where ConfigT: struct, ConfigurableOnnxModel.IConfig
     {
+        private static ConfigurableOnnxModel.BuiltConfig CONFIG => BuiltConfigCache<ConfigT>.BUILT_CONFIG;
+        
+        public ConfigurableOnnxModel.BuiltConfig Config => CONFIG;
+        
         public readonly struct SessionHandle: IDisposable
         {
             public readonly InferenceSession Session;
@@ -179,7 +183,7 @@ namespace ONNX.Common
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                if (ConfigT.Config.MemoryMode.HasFlag(OnnxMemoryModes.UnloadAfterUse))
+                if (CONFIG.MemoryMode.HasFlag(OnnxMemoryModes.UnloadAfterUse))
                 {
                     Session?.Dispose();
                 }
@@ -190,7 +194,7 @@ namespace ONNX.Common
         
         public ConfigurableOnnxModel()
         {
-            var memoryMode = ConfigT.Config.MemoryMode;
+            var memoryMode = Config.MemoryMode;
             
             if (!memoryMode.HasFlag(OnnxMemoryModes.DeferLoading) &&
                 !memoryMode.HasFlag(OnnxMemoryModes.UnloadAfterUse))
@@ -203,7 +207,7 @@ namespace ONNX.Common
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public SessionHandle GetSessionHandle()
         {
-            var memoryMode = ConfigT.Config.MemoryMode;
+            var memoryMode = Config.MemoryMode;
 
             InferenceSession session;
             
@@ -232,7 +236,7 @@ namespace ONNX.Common
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static InferenceSession CreateSession()
         {
-            var config = ConfigT.Config;
+            var config = CONFIG;
             
             return new(modelPath: config.ModelPath, options: config.SessionOptions);
         }
@@ -241,5 +245,10 @@ namespace ONNX.Common
         {
             Session?.Dispose();
         }
+    }
+
+    internal static class BuiltConfigCache<ConfigT> where ConfigT: struct, ConfigurableOnnxModel.IConfig
+    {
+        public static readonly ConfigurableOnnxModel.BuiltConfig BUILT_CONFIG = ConfigT.ConfigBuilder.Build();
     }
 }

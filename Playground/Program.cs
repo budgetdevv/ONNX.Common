@@ -44,11 +44,7 @@ namespace Playground
                 "New makeup trends focus on bold colors and innovative techniques",
             };
             
-            // DisposeSessionHandle_DISASM(GetSessionHandle_DISASM(model.Model));
-            
-            TokenizeBatch_DISASM(model.Tokenizer, list.ToArray(), out var outputs);
-            
-            DisposeTokenizeBatchOutput_DISASM(*outputs.Buffer.Ptr);
+            DisposeSessionHandle_DISASM(GetSessionHandle_DISASM(model.Model));
         }
         
         private const MethodImplOptions DISASM_METHOD_IMPL_OPTIONS = MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization;
@@ -64,48 +60,28 @@ namespace Playground
         {
             handle.Dispose();
         }
-
-        [MethodImpl(DISASM_METHOD_IMPL_OPTIONS)]
-        private static void TokenizeBatch_DISASM(
-            Tokenizer<JinaReranker.TokenizerConfig> 
-                tokenizer, ReadOnlySpan<string> inputs,
-            out NativeMemory<TokenizeOutput> outputs)
-        {
-            tokenizer.TokenizeBatch(inputs, outputs = new((nuint) inputs.Length));
-        }
-        
-        [MethodImpl(DISASM_METHOD_IMPL_OPTIONS)]
-        private static void DisposeTokenizeBatchOutput_DISASM(TokenizeOutput output)
-        {
-            output.Dispose();
-        }
         
         private struct OnnxConfig: ConfigurableOnnxModel.IConfig
         {
-            private static readonly ConfigurableOnnxModel.BuiltConfig CONFIG = 
+            public static ConfigurableOnnxModel.ConfigBuilder ConfigBuilder =>
                 new ConfigurableOnnxModel.ConfigBuilder()
                     .WithBackendType(BackendType.CPU)
                     .WithMemoryMode(OnnxMemoryModes.DeferLoading)
                     .WithRegisterOrtExtensions()
-                    .WithModelPath("/Users/trumpmcdonaldz/Desktop/JINA/model_quantized.onnx")
-                    .Build();
-
-            public static ConfigurableOnnxModel.BuiltConfig Config => CONFIG;
+                    .WithModelPath("/Users/trumpmcdonaldz/Desktop/JINA/model_quantized.onnx");
         }
 
         private struct JinaReranker
         {
             internal struct TokenizerConfig: Tokenizer.IConfig
             {
-                private static readonly Tokenizer.BuiltConfig BUILT_CONFIG =
+                public static Tokenizer.ConfigBuilder ConfigBuilder =>
                     new Tokenizer.ConfigBuilder()
-                    .SetExpectedMaxInputLength(512)
-                    .SetExpectedMaxBatches(16)
-                    .SetExceedExpectedMaxBatchesBehavior(Tokenizers.NET.Tokenizer.ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
-                    .SetTokenizerJsonPath("Resources/jina_tokenizer.json")
-                    .Build();
+                        .SetExpectedMaxInputLength(512)
+                        .SetExpectedMaxBatches(16)
+                        .SetExceedExpectedMaxBatchesBehavior(Tokenizers.NET.Tokenizer.ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
+                        .SetTokenizerJsonPath("Resources/jina_tokenizer.json");
 
-                public static Tokenizer.BuiltConfig BuiltConfig => BUILT_CONFIG;
             }
 
             public readonly struct Output(int index, float score)

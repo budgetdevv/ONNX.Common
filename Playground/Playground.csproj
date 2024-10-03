@@ -22,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Tokenizers.NET" Version="1.1.0-alpha.12-dc88085" />
+      <PackageReference Include="Tokenizers.NET" Version="1.1.0-alpha.37-558a713" />
     </ItemGroup>
     
     <ItemGroup>
