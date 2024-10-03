@@ -80,7 +80,8 @@ namespace Playground
                         .SetExpectedMaxInputLength(512)
                         .SetExpectedMaxBatches(16)
                         .SetExceedExpectedMaxBatchesBehavior(Tokenizers.NET.Tokenizer.ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
-                        .SetTokenizerJsonPath("Resources/jina_tokenizer.json");
+                        //.SetTokenizerJsonPath("Resources/jina_tokenizer.json");
+                        .SetRawTokenizerData(new HttpClient().GetByteArrayAsync("https://huggingface.co/jinaai/jina-reranker-v2-base-multilingual/resolve/main/tokenizer.json").Result);
 
             }
 
