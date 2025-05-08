@@ -12,8 +12,6 @@ namespace ONNX.Common
         {
             public SessionOptions SessionOptions;
             
-            public string ModelPath;  
-            
             public BackendType BackendType;
 
             public int DeviceID;
@@ -33,8 +31,6 @@ namespace ONNX.Common
             internal BuiltConfig(ConfigBuilder configBuilder)
             {
                 var sessionOptions = SessionOptions = new();
-                
-                ModelPath = configBuilder.ModelPath ?? throw new ArgumentNullException(nameof(configBuilder.ModelPath));
                 
                 var backendType = BackendType = configBuilder.BackendType;
                 
@@ -82,8 +78,6 @@ namespace ONNX.Common
         
         public struct ConfigBuilder
         {
-            public string? ModelPath;  
-            
             public BackendType BackendType;
 
             public int DeviceID;
@@ -96,20 +90,11 @@ namespace ONNX.Common
 
             public ConfigBuilder()
             {
-                ModelPath = null;
                 BackendType = BackendType.CPU;
                 DeviceID = 0;
                 MemoryMode = OnnxMemoryModes.None;
                 RegisterOrtExtensions = false;
                 LoggingLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_WARNING;
-            }
-
-            [UnscopedRef]
-            public ref ConfigBuilder WithModelPath(string? modelPath)
-            {
-                ModelPath = modelPath;
-                
-                return ref this;
             }
             
             [UnscopedRef]
@@ -189,17 +174,24 @@ namespace ONNX.Common
                 }
             }
         }
-        
+
+        private readonly string ModelPath;
+
         private InferenceSession? Session;
-        
-        public ConfigurableOnnxModel()
+
+        [Obsolete("Use constructor with parameters.", error: true)]
+        public ConfigurableOnnxModel() { }
+
+        public ConfigurableOnnxModel(string modelPath)
         {
+            ModelPath = modelPath;
+
             var memoryMode = Config.MemoryMode;
             
             if (!memoryMode.HasFlag(OnnxMemoryModes.DeferLoading) &&
                 !memoryMode.HasFlag(OnnxMemoryModes.UnloadAfterUse))
             {
-                Session = CreateSession();
+                Session = CreateSession(modelPath);
             }
         }
         
@@ -209,6 +201,8 @@ namespace ONNX.Common
         {
             var memoryMode = Config.MemoryMode;
 
+            var modelPath = ModelPath;
+
             InferenceSession session;
             
             // If UnloadAfterUse is set, we can optimize away the null check,
@@ -216,13 +210,13 @@ namespace ONNX.Common
             // UnloadAfterUse is also implicitly DeferLoading.
             if (memoryMode.HasFlag(OnnxMemoryModes.UnloadAfterUse))
             {
-                session = CreateSession();
+                session = CreateSession(modelPath);
             }
             
             // If we are deferring loading, we still cache the model...
             else if (memoryMode.HasFlag(OnnxMemoryModes.DeferLoading))
             {
-                session = (Session ??= CreateSession());
+                session = (Session ??= CreateSession(modelPath));
             }
 
             else //The model is already cached!
@@ -234,11 +228,11 @@ namespace ONNX.Common
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static InferenceSession CreateSession()
+        private static InferenceSession CreateSession(string modelPath)
         {
             var config = CONFIG;
             
-            return new(modelPath: config.ModelPath, options: config.SessionOptions);
+            return new(modelPath, options: config.SessionOptions);
         }
         
         public void Dispose()

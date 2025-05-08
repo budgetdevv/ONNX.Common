@@ -6,12 +6,13 @@ using ONNX.Common.Configs;
 using ONNX.Common.Helpers;
 using ONNX.Common.Tensor;
 using Tokenizers.NET;
-using Tokenizers.NET.Collections;
 
 namespace Playground
 {
     internal static class Program
     {
+        private const string MODEL_PATH = "/Users/trumpmcdonaldz/Desktop/JINA/model_quantized.onnx";
+
         [ModuleInitializer]
         internal static void Init()
         {
@@ -34,7 +35,7 @@ namespace Playground
             // $Env:DOTNET_JitDisasm="*_DISASM"
             // dotnet run -c Release
             
-            var model = new JinaReranker();
+            var model = new JinaReranker(MODEL_PATH);
 
             // Ensure we ain't cheating by passing a constant span value
             // E.x. TokenizeBatch_DISASM(model.Tokenizer, [ "Hi", "Bye" ]);
@@ -67,8 +68,7 @@ namespace Playground
                 new ConfigurableOnnxModel.ConfigBuilder()
                     .WithBackendType(BackendType.CPU)
                     .WithMemoryMode(OnnxMemoryModes.DeferLoading)
-                    .WithRegisterOrtExtensions()
-                    .WithModelPath("/Users/trumpmcdonaldz/Desktop/JINA/model_quantized.onnx");
+                    .WithRegisterOrtExtensions();
         }
 
         private struct JinaReranker
@@ -96,10 +96,16 @@ namespace Playground
             
             internal ConfigurableOnnxModel<OnnxConfig> Model;
 
+            [Obsolete("Use constructor with parameters.", error: true)]
             public JinaReranker()
             {
+
+            }
+
+            public JinaReranker(string modelPath)
+            {
                 Tokenizer = new();
-                Model = new();
+                Model = new(modelPath);
             }
             
             // Very messy and suboptimal but it works
@@ -219,7 +225,7 @@ namespace Playground
         
         private static void SampleInference()
         {
-            var ranker = new JinaReranker();
+            var ranker = new JinaReranker(MODEL_PATH);
 
             ReadOnlySpan<string> inputs =
             [
