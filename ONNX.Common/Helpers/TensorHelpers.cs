@@ -13,7 +13,7 @@ namespace ONNX.Common.Helpers
     {
         
         public static ManagedTensor<T> CreateAndFillTensor<T>(T fill, ReadOnlySpan<int> dimensions)
-            where T : unmanaged
+            where T: unmanaged
         {
             var tensor = new ManagedTensor<T>(dimensions, initialize: false);
             
@@ -46,15 +46,16 @@ namespace ONNX.Common.Helpers
 
             public TopKSession()
             {
-                Model = new(
-                    ResourceHelpers.GetResourceBytes(
-                        typeof(TensorHelpers).Assembly, 
-                        "topk.onnx")!);
+                Model = new(ResourceHelpers.GetResourceBytes(
+                    typeof(TensorHelpers).Assembly,
+                    "topk.onnx")!
+                );
 
                 KInputBuffer = new(
                     (ReadOnlySpan<nint>) [ 1 ], 
                     initialize: false,
-                    pinned: true);
+                    pinned: true
+                );
             }
         }
         
@@ -159,13 +160,13 @@ namespace ONNX.Common.Helpers
         }
 
         public static NamedOnnxValue AsNamedOnnxValue<T>(this DenseTensor<T> tensor, string name)
-            where T : unmanaged
+            where T: unmanaged
         {
             return NamedOnnxValue.CreateFromTensor(name, tensor);
         }
         
         public static NamedOnnxValue AllocateEmptyNamedTensorValue<T>(string name)
-            where T : unmanaged
+            where T: unmanaged
         {
             var tensor = new DenseTensor<T>(Array.Empty<T>().AsMemory(), [ 0 ]);
             
@@ -174,14 +175,14 @@ namespace ONNX.Common.Helpers
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ManagedTensor<T> Squeeze<T>(this ManagedTensor<T> tensor)
-            where T : unmanaged
+            where T: unmanaged
         {
             return tensor.SNTensor.Squeeze();
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ManagedTensor<T> Reshape<T>(this ManagedTensor<T> tensor, ReadOnlySpan<nint> dimensions)
-            where T : unmanaged
+            where T: unmanaged
         {
             return tensor.SNTensor.Reshape(dimensions);
         }
