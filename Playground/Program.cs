@@ -1,32 +1,33 @@
 ﻿using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using NoParamlessCtor.Shared.Attributes;
 using ONNX.Common;
 using ONNX.Common.Configs;
 using ONNX.Common.Helpers;
 using ONNX.Common.Tensor;
 using Tokenizers.NET;
+using Tokenizers.NET.Helpers;
 
 namespace Playground
 {
-    internal static class Program
+    internal static partial class Program
     {
         private const string MODEL_PATH = "/Users/trumpmcdonaldz/Desktop/JINA/model_quantized.onnx";
 
         [ModuleInitializer]
         internal static void Init()
         {
-            RuntimeHelpers.RunClassConstructor(typeof(JinaReranker.TokenizerConfig).TypeHandle);
             RuntimeHelpers.RunClassConstructor(typeof(JinaReranker).TypeHandle);
         }
         
-        private static void Main(string[] args)
+        private static async Task Main(string[] args)
         {
-            CheckCodegen();
-            // SampleInference();
+            await CheckCodegen();
+            // await SampleInference();
         }
         
-        private static unsafe void CheckCodegen()
+        private static async Task CheckCodegen()
         {
             // How to check codegen:
             // Mac:
@@ -35,7 +36,7 @@ namespace Playground
             // $Env:DOTNET_JitDisasm="*_DISASM"
             // dotnet run -c Release
             
-            var model = new JinaReranker(MODEL_PATH);
+            var model = await JinaReranker.InitializeAsync(MODEL_PATH);
 
             // Ensure we ain't cheating by passing a constant span value
             // E.x. TokenizeBatch_DISASM(model.Tokenizer, [ "Hi", "Bye" ]);
@@ -51,18 +52,18 @@ namespace Playground
         private const MethodImplOptions DISASM_METHOD_IMPL_OPTIONS = MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization;
         
         [MethodImpl(DISASM_METHOD_IMPL_OPTIONS)]
-        private static ConfigurableOnnxModel<OnnxConfig>.SessionHandle GetSessionHandle_DISASM(ConfigurableOnnxModel<OnnxConfig> model)
+        private static ConfigurableOnnxModel<JinaRerankerONNXConfig>.SessionHandle GetSessionHandle_DISASM(ConfigurableOnnxModel<JinaRerankerONNXConfig> model)
         {
             return model.GetSessionHandle();
         }
         
         [MethodImpl(DISASM_METHOD_IMPL_OPTIONS)]
-        private static void DisposeSessionHandle_DISASM(ConfigurableOnnxModel<OnnxConfig>.SessionHandle handle)
+        private static void DisposeSessionHandle_DISASM(ConfigurableOnnxModel<JinaRerankerONNXConfig>.SessionHandle handle)
         {
             handle.Dispose();
         }
         
-        private struct OnnxConfig: ConfigurableOnnxModel.IConfig
+        private readonly struct JinaRerankerONNXConfig: ConfigurableOnnxModel.IConfig
         {
             public static ConfigurableOnnxModel.ConfigBuilder ConfigBuilder =>
                 new ConfigurableOnnxModel.ConfigBuilder()
@@ -71,43 +72,35 @@ namespace Playground
                     .WithRegisterOrtExtensions();
         }
 
-        private struct JinaReranker
+        [NoParamlessCtor]
+        private partial struct JinaReranker(Tokenizer tokenizer, ConfigurableOnnxModel<JinaRerankerONNXConfig> model)
         {
-            internal struct TokenizerConfig: Tokenizer.IConfig
-            {
-                public static Tokenizer.ConfigBuilder ConfigBuilder =>
-                    new Tokenizer.ConfigBuilder()
-                        .SetExpectedMaxInputLength(512)
-                        .SetExpectedMaxBatches(16)
-                        .SetExceedExpectedMaxBatchesBehavior(Tokenizers.NET.Tokenizer.ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
-                        //.SetTokenizerJsonPath("Resources/jina_tokenizer.json");
-                        .SetRawTokenizerData(new HttpClient().GetByteArrayAsync("https://huggingface.co/jinaai/jina-reranker-v2-base-multilingual/resolve/main/tokenizer.json").Result);
-
-            }
-
             public readonly struct Output(int index, float score)
             {
                 public readonly int Index = index;
 
                 public readonly float Score = score;
             }
-            
-            internal Tokenizer<TokenizerConfig> Tokenizer;
-            
-            internal ConfigurableOnnxModel<OnnxConfig> Model;
 
-            [Obsolete("Use constructor with parameters.", error: true)]
-            public JinaReranker()
+            internal Tokenizer Tokenizer = tokenizer;
+            
+            internal ConfigurableOnnxModel<JinaRerankerONNXConfig> Model = model;
+
+            public static async ValueTask<JinaReranker> InitializeAsync(string onnxModelPath)
             {
+                var tokenizer = (await new TokenizerBuilder()
+                    .SetExpectedMaxInputLength(512)
+                    .SetExpectedMaxBatches(16)
+                    .SetExceedExpectedMaxBatchesBehavior(ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
+                    //.SetTokenizerJsonPath("Resources/jina_tokenizer.json");
+                    .DownloadFromHuggingFaceRepoAsync("jinaai/jina-reranker-v2-base-multilingual"))
+                    .Build();
 
+                var model = new ConfigurableOnnxModel<JinaRerankerONNXConfig>(onnxModelPath);
+
+                return new JinaReranker(tokenizer, model);
             }
 
-            public JinaReranker(string modelPath)
-            {
-                Tokenizer = new();
-                Model = new(modelPath);
-            }
-            
             // Very messy and suboptimal but it works
             public Output[] Rerank(string query, params ReadOnlySpan<string> inputs)
             {
@@ -223,9 +216,9 @@ namespace Playground
             }
         }
         
-        private static void SampleInference()
+        private static async Task SampleInference()
         {
-            var ranker = new JinaReranker(MODEL_PATH);
+            var reRanker = await JinaReranker.InitializeAsync(MODEL_PATH);
 
             ReadOnlySpan<string> inputs =
             [
@@ -241,7 +234,7 @@ namespace Playground
                 "新しいメイクのトレンドは鮮やかな色と革新的な技術に焦点を当てています",
             ];
             
-            var outputs = ranker.Rerank(
+            var outputs = reRanker.Rerank(
                 query: "Organic skincare products for sensitive skin", 
                 inputs
             );

@@ -13,7 +13,7 @@
     </PropertyGroup>
 
     <PropertyGroup Condition="$([MSBuild]::IsOsPlatform('OSX'))">
-        <!--        <RuntimeIdentifier>osx-x64</RuntimeIdentifier>-->
+        <!-- <RuntimeIdentifier>osx-x64</RuntimeIdentifier> -->
         <RuntimeIdentifier>osx-arm64</RuntimeIdentifier>
     </PropertyGroup>
     
@@ -22,7 +22,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Tokenizers.NET" Version="1.1.0-alpha.37-558a713" />
+      <PackageReference Include="NoParamlessCtor" Version="1.1.1-alpha.29.07c3a8d" />
+      <PackageReference Include="Tokenizers.NET" Version="1.1.0-alpha.47-d0bebbd" />
     </ItemGroup>
     
     <ItemGroup>
@@ -31,10 +32,6 @@
                  CopyToOutputDirectory="PreserveNewest"
                  Condition="Exists('$(MSBuildProjectDirectory)/Resources/jina_tokenizer.json')"
         />
-    </ItemGroup>
-    
-    <ItemGroup>
-      <Folder Include="Resources\Embedded\" />
     </ItemGroup>
 
     <PropertyGroup>
