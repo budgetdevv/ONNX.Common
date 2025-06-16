@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFrameworks>net8.0; net9.0</TargetFrameworks>
         <Nullable>enable</Nullable>
         <LangVersion>preview</LangVersion>
     </PropertyGroup>
@@ -9,7 +9,6 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.18.1" />
         <PackageReference Include="Microsoft.ML.OnnxRuntime.Extensions" Version="0.12.0" />
-        <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
         <PackageReference Include="System.Numerics.Tensors" Version="9.0.0-preview.7.24405.7" />
     </ItemGroup>
 
