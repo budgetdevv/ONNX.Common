@@ -22,8 +22,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="NoParamlessCtor" Version="1.1.1-alpha.29.07c3a8d" />
-      <PackageReference Include="Tokenizers.NET" Version="1.1.0-alpha.47-d0bebbd" />
+      <PackageReference Include="NoParamlessCtor" Version="1.1.1-alpha.31.cb558c4" />
+      <PackageReference Include="Tokenizers.NET" Version="1.1.0-alpha.50-b9fd3da" />
     </ItemGroup>
     
     <ItemGroup>
