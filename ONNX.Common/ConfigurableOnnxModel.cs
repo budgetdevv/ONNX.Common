@@ -1,14 +1,14 @@
-using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.ML.OnnxRuntime;
+using NoParamlessCtor.Shared.Attributes;
 using ONNX.Common.Configs;
 
 namespace ONNX.Common
 {
-    public static class ConfigurableOnnxModel
+    public static partial class ConfigurableOnnxModel
     {
-        public struct BuiltConfig
+        [NoParamlessCtor]
+        public partial struct BuiltConfig
         {
             public SessionOptions SessionOptions;
             
@@ -21,12 +21,6 @@ namespace ONNX.Common
             public bool RegisterOrtExtensions;
             
             public OrtLoggingLevel LoggingLevel;
-            
-            [Obsolete("Use constructor with parameters", error: true)]
-            public BuiltConfig()
-            {
-                throw new NotSupportedException();
-            }
             
             internal BuiltConfig(ConfigBuilder configBuilder)
             {
@@ -142,22 +136,17 @@ namespace ONNX.Common
         }
     }
     
-    public struct ConfigurableOnnxModel<ConfigT>: IDisposable
+    public partial struct ConfigurableOnnxModel<ConfigT>: IDisposable
         where ConfigT: struct, ConfigurableOnnxModel.IConfig
     {
         private static ConfigurableOnnxModel.BuiltConfig CONFIG => BuiltConfigCache<ConfigT>.BUILT_CONFIG;
         
         public ConfigurableOnnxModel.BuiltConfig Config => CONFIG;
-        
-        public readonly struct SessionHandle: IDisposable
+
+        [NoParamlessCtor]
+        public readonly partial struct SessionHandle: IDisposable
         {
             public readonly InferenceSession Session;
-
-            [Obsolete("Use constructor with parameters", error: true)]
-            public SessionHandle()
-            {
-                throw new NotSupportedException();
-            }
             
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal SessionHandle(InferenceSession session)
