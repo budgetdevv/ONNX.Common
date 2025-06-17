@@ -10,6 +10,7 @@
         <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.22.0" />
         <PackageReference Include="Microsoft.ML.OnnxRuntime.Extensions" Version="0.14.0" />
         <PackageReference Include="System.Numerics.Tensors" Version="10.0.0-preview.5.25277.114" />
+        <PackageReference Include="NoParamlessCtor" Version="1.1.1-alpha.31.cb558c4" />
     </ItemGroup>
 
     <ItemGroup>

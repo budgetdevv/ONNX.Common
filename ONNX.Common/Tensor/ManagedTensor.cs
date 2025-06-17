@@ -1,14 +1,14 @@
-using System;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using NoParamlessCtor.Shared.Attributes;
 using ONNX.Common.Helpers;
 
 namespace ONNX.Common.Tensor
 {
-    public readonly struct ManagedTensor<T> where T: unmanaged
+    [NoParamlessCtor]
+    public readonly partial struct ManagedTensor<T> where T: unmanaged
     {
         public readonly T[] ValuesArr;
         
@@ -38,9 +38,7 @@ namespace ONNX.Common.Tensor
             #endif
 
             ValuesArr = arr;
-            
-            // OnnxORTValue = OrtValue.CreateTensorValueFromMemory<T>(pinnedMemory, dimensions.WidenDimensions());
-            
+
             var memory = snTensor.IsPinned ? 
                 MemoryMarshal.CreateFromPinnedArray(arr, 0, arr.Length) :
                 arr.AsMemory();
@@ -74,7 +72,8 @@ namespace ONNX.Common.Tensor
             return SystemNumericsTensor.Create<T>(
                 tensor.Buffer.ToArray(), 
                 (TensorDimensions) tensor.Dimensions, 
-                pinned);
+                pinned
+            );
         }
         
         public NamedOnnxValue AsNamedOnnxValue(string name)
