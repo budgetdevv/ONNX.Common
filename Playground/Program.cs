@@ -1,11 +1,14 @@
 ﻿using System.Buffers;
+using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Microsoft.ML.OnnxRuntime;
 using NoParamlessCtor.Shared.Attributes;
 using ONNX.Common;
 using ONNX.Common.Configs;
 using ONNX.Common.Helpers;
 using ONNX.Common.Tensor;
+using ONNX.Common.Tensors;
 using Tokenizers.NET;
 using Tokenizers.NET.Helpers;
 
@@ -23,8 +26,9 @@ namespace Playground
         
         private static async Task Main(string[] args)
         {
-            await CheckCodegen();
-            // await SampleInference();
+            // await CheckCodegen();
+
+            await SampleInference();
         }
         
         private static async Task CheckCodegen()
@@ -88,12 +92,18 @@ namespace Playground
 
             public static async ValueTask<JinaReranker> InitializeAsync(string onnxModelPath)
             {
-                var tokenizer = (await new TokenizerBuilder()
+                // var tokenizer = (await new TokenizerBuilder()
+                //     .SetExpectedMaxInputLength(512)
+                //     .SetExpectedMaxBatches(16)
+                //     .SetExceedExpectedMaxBatchesBehavior(ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
+                //     .DownloadFromHuggingFaceRepoAsync("jinaai/jina-reranker-v2-base-multilingual"))
+                //     .Build();
+
+                var tokenizer = new TokenizerBuilder()
                     .SetExpectedMaxInputLength(512)
                     .SetExpectedMaxBatches(16)
                     .SetExceedExpectedMaxBatchesBehavior(ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
-                    //.SetTokenizerJsonPath("Resources/jina_tokenizer.json");
-                    .DownloadFromHuggingFaceRepoAsync("jinaai/jina-reranker-v2-base-multilingual"))
+                    .SetTokenizerJsonPath("Resources/jina_tokenizer.json")
                     .Build();
 
                 var model = new ConfigurableOnnxModel<JinaRerankerONNXConfig>(onnxModelPath);
@@ -116,6 +126,11 @@ namespace Playground
 
                 var tokenizeOutputSpan = tokenizeOutputs.Buffer.AsSpan();
 
+                // foreach (var output in tokenizeOutputSpan)
+                // {
+                //     Console.WriteLine(output.IDs.Length);
+                // }
+
                 var firstOutput = tokenizeOutputSpan[0];
                 
                 // Console.WriteLine(Encoding.UTF8.GetString(tokenizer.Decode(firstOutput.IDs, false).TextBuffer.AsReadOnlySpan()));
@@ -123,22 +138,24 @@ namespace Playground
                 // Console.WriteLine(firstOutput.IDs.AsReadOnlySpan().GetSpanPrintString());
                 
                 var numInputs = inputs.Length;
-                
-                var dims = (TensorDimensions) (ReadOnlySpan<int>) [ numInputs, (int) firstOutput.IDs.Length ];
+
+                var dims = (ReadOnlySpan<nint>) [ numInputs, (nint) firstOutput.IDs.Length ];
                 
                 var idTensor = new ManagedTensor<long>(
                     dims, 
                     initialize: false,
-                    pinned: true);
+                    pinned: true
+                );
 
-                var snIDTensor = idTensor.SNTensor;
+                var snIDTensor = idTensor.Tensor;
                 
                 var attentionMaskTensor = new ManagedTensor<long>(
                     dims, 
                     initialize: false,
-                    pinned: true);
+                    pinned: true
+                );
 
-                var snAttentionMaskTensor = attentionMaskTensor.SNTensor;
+                var snAttentionMaskTensor = attentionMaskTensor.Tensor;
 
                 var currentBatchIndex = 0;
                 
@@ -163,13 +180,13 @@ namespace Playground
                     
                     idSpan.CopyTo(MemoryMarshal.CreateSpan(
                         ref idSlice.GetPinnableReference(),
-                        (int) idSlice.FlattenedLength)
-                    );
+                        (int) idSlice.FlattenedLength
+                    ));
                     
                     attentionMaskSpan.CopyTo(MemoryMarshal.CreateSpan(
                         ref attentionMaskSlice.GetPinnableReference(),
-                        (int) attentionMaskSlice.FlattenedLength)
-                    );
+                        (int) attentionMaskSlice.FlattenedLength
+                    ));
                     
                     // Unfortunately slicing copies atm
                     snIDTensor[range] = idSlice;
@@ -179,38 +196,46 @@ namespace Playground
                 }
                 
                 var logitsTensor = new ManagedTensor<float>(
-                    (ReadOnlySpan<int>) [ numInputs, 1 ], 
+                    [ numInputs, 1 ],
                     initialize: false,
                     pinned: true);
-                
+
                 using (var handle = Model.GetSessionHandle())
                 {
-                    handle.Session.Run(
-                        inputs: 
-                        [ 
-                            idTensor.AsNamedOnnxValue("input_ids"),
-                            attentionMaskTensor.AsNamedOnnxValue("attention_mask"),
-                        ],
-                        outputs: [ logitsTensor.AsNamedOnnxValue("logits") ]
-                    );
-                    
-                    // logitsTensor.PrintTensor();
+                    var session = handle.Session;
 
-                    logitsTensor = logitsTensor.Reshape([ numInputs ]);
-                    
-                    // logitsTensor.PrintTensor();
-                    
+                    using var binding = session.CreateIoBinding();
+
+                    idTensor.BindAsInput(binding, "input_ids");
+
+                    attentionMaskTensor.BindAsInput(binding, "attention_mask");
+
+                    logitsTensor.BindAsOutput(binding, "logits");
+
+                    session.RunWithBinding(
+                        runOptions: new RunOptions(),
+                        ioBinding: binding
+                    );
+
+                    logitsTensor.Print();
+
+                    // logitsTensor.Reshape([ numInputs ]);
+
+                    logitsTensor.Squeeze();
+
+                    logitsTensor.Print();
+
                     var topK = logitsTensor.TopK((ulong) numInputs);
 
                     var outputs = new List<Output>(numInputs);
-                    
+
                     var currentIndex = 0;
-                    
+
                     foreach (var index in topK.Indices.ValuesArr)
                     {
                         outputs.Add(new((int) index, topK.Logits.ValuesArr[currentIndex++]));
                     }
-                    
+
                     return outputs.ToArray();
                 }
             }
