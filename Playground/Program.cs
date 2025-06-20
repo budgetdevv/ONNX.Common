@@ -158,47 +158,37 @@ namespace Playground
                 var snAttentionMaskTensor = attentionMaskTensor.Tensor;
 
                 var currentBatchIndex = 0;
-                
+
                 foreach (var output in tokenizeOutputSpan)
                 {
                     var currentBatchIndexPlusOne = currentBatchIndex + 1;
 
                     ReadOnlySpan<NRange> range = [currentBatchIndex..currentBatchIndexPlusOne, NRange.All];
-                    
-                    // End index is exclusive
-                    // https://sharplab.io/#v2:EYLgxg9gTgpgtADwGwBYA0AXEUCuA7AHwAEAmARgFgAoagNwEMoACAZwAd68mBeJgCgBKMegBMA8ngA2ATwDKHPAB4AlngwA+AJRMA2kgCcaJiQC6AbmrUA9FaYBRPCKaqRMBM5ZM3YSThbLaGDpGVkllMBgyHlYFHQAGADoEsnNLKiIyfT4WMIiyeJNNC3TM7NzIhIAZGDwAcwwACyKgA==
-                    var idSlice = snIDTensor[range];
-                    var attentionMaskSlice = snAttentionMaskTensor[range];
-                    
-                    // Slow but whatever
+
                     using var ids = output.IDs.Widen();
-                    
+
+                    var idsSpan = new TensorSpan<long>(ids.Buffer.Cast<long>().AsSpan());
+
+                    var idSlice = snIDTensor[range];
+
+                    idsSpan.CopyTo(idSlice);
+
                     using var attentionMask = output.AttentionMask.Widen();
 
-                    var idSpan = ids.Buffer.Cast<long>().AsSpan();
-                    var attentionMaskSpan = attentionMask.Buffer.Cast<long>().AsSpan();
-                    
-                    idSpan.CopyTo(MemoryMarshal.CreateSpan(
-                        ref idSlice.GetPinnableReference(),
-                        (int) idSlice.FlattenedLength
-                    ));
-                    
-                    attentionMaskSpan.CopyTo(MemoryMarshal.CreateSpan(
-                        ref attentionMaskSlice.GetPinnableReference(),
-                        (int) attentionMaskSlice.FlattenedLength
-                    ));
-                    
-                    // Unfortunately slicing copies atm
-                    snIDTensor[range] = idSlice;
-                    snAttentionMaskTensor[range] = attentionMaskSlice;
-                        
+                    var attentionMaskSlice = snAttentionMaskTensor[range];
+
+                    var attentionMaskSpan = new TensorSpan<long>(attentionMask.Buffer.Cast<long>().AsSpan());
+
+                    attentionMaskSpan.CopyTo(attentionMaskSlice);
+
                     currentBatchIndex = currentBatchIndexPlusOne;
                 }
                 
                 var logitsTensor = new ManagedTensor<float>(
                     [ numInputs, 1 ],
                     initialize: false,
-                    pinned: true);
+                    pinned: true
+                );
 
                 using (var handle = Model.GetSessionHandle())
                 {
@@ -217,13 +207,13 @@ namespace Playground
                         ioBinding: binding
                     );
 
-                    logitsTensor.Print();
+                    // logitsTensor.Print();
 
                     // logitsTensor.Reshape([ numInputs ]);
 
                     logitsTensor.Squeeze();
 
-                    logitsTensor.Print();
+                    // logitsTensor.Print();
 
                     var topK = logitsTensor.TopK((ulong) numInputs);
 
