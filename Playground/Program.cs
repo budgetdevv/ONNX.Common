@@ -1,13 +1,10 @@
 ﻿using System.Buffers;
 using System.Numerics.Tensors;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Microsoft.ML.OnnxRuntime;
 using NoParamlessCtor.Shared.Attributes;
 using ONNX.Common;
 using ONNX.Common.Configs;
 using ONNX.Common.Helpers;
-using ONNX.Common.Tensor;
 using ONNX.Common.Tensors;
 using Tokenizers.NET;
 using Tokenizers.NET.Helpers;
