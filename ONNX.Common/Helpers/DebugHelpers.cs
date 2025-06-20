@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Text;
-using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
-using ONNX.Common.Tensor;
 
 namespace ONNX.Common.Helpers
 {
