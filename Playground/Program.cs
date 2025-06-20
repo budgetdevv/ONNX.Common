@@ -89,18 +89,22 @@ namespace Playground
 
             public static async ValueTask<JinaReranker> InitializeAsync(string onnxModelPath)
             {
-                // var tokenizer = (await new TokenizerBuilder()
-                //     .SetExpectedMaxInputLength(512)
-                //     .SetExpectedMaxBatches(16)
-                //     .SetExceedExpectedMaxBatchesBehavior(ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
-                //     .DownloadFromHuggingFaceRepoAsync("jinaai/jina-reranker-v2-base-multilingual"))
-                //     .Build();
-
-                var tokenizer = new TokenizerBuilder()
+                var tokenizer = (await new TokenizerBuilder()
                     .SetExpectedMaxInputLength(512)
                     .SetExpectedMaxBatches(16)
                     .SetExceedExpectedMaxBatchesBehavior(ExceedExpectedMaxBatchesBehavior.AllocateBuffer)
-                    .SetTokenizerJsonPath("Resources/jina_tokenizer.json")
+                    .DownloadFromHuggingFaceRepoAsync("jinaai/jina-reranker-v2-base-multilingual"))
+                    .ModifyTokenizerConfig(x =>
+                    {
+                        x.Padding = new Padding()
+                        {
+                            Strategy = new Padding.BatchLongestStrategy(),
+                            Direction = "Right",
+                            PadToken = "[PAD]",
+                        };
+
+                        return x;
+                    })
                     .Build();
 
                 var model = new ConfigurableOnnxModel<JinaRerankerONNXConfig>(onnxModelPath);
@@ -121,7 +125,7 @@ namespace Playground
                 
                 using var tokenizeOutputs = tokenizer.TokenizeBatch(inputs, addSpecialTokens: false);
 
-                var tokenizeOutputSpan = tokenizeOutputs.Buffer.AsSpan();
+                var tokenizeOutputSpan = tokenizeOutputs.Window.AsSpan();
 
                 // foreach (var output in tokenizeOutputSpan)
                 // {
@@ -164,7 +168,7 @@ namespace Playground
 
                     using var ids = output.IDs.Widen();
 
-                    var idsSpan = new TensorSpan<long>(ids.Buffer.Cast<long>().AsSpan());
+                    var idsSpan = new TensorSpan<long>(ids.Window.Cast<long>().AsSpan());
 
                     var idSlice = snIDTensor[range];
 
@@ -174,7 +178,7 @@ namespace Playground
 
                     var attentionMaskSlice = snAttentionMaskTensor[range];
 
-                    var attentionMaskSpan = new TensorSpan<long>(attentionMask.Buffer.Cast<long>().AsSpan());
+                    var attentionMaskSpan = new TensorSpan<long>(attentionMask.Window.Cast<long>().AsSpan());
 
                     attentionMaskSpan.CopyTo(attentionMaskSlice);
 
